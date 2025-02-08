@@ -564,4 +564,5 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun check
+    private fun checkForUpdate() {
+        if (view
