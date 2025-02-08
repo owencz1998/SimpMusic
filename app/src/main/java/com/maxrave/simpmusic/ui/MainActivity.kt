@@ -171,9 +171,6 @@ class MainActivity : AppCompatActivity() {
             )
             putString(SELECTED_LANGUAGE, AppCompatDelegate.getApplicationLocales().toLanguageTags())
         }
-//
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-//            WindowCompat.setDecorFitsSystemWindows(window, false)
         enableEdgeToEdge(
             navigationBarStyle =
                 SystemBarStyle.auto(
@@ -183,9 +180,6 @@ class MainActivity : AppCompatActivity() {
         )
         viewModel.checkIsRestoring()
         viewModel.runWorker()
-//        } else {
-//            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
-//        }
 
         if (!EasyPermissions.hasPermissions(this, Manifest.permission.POST_NOTIFICATIONS)) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -208,11 +202,16 @@ class MainActivity : AppCompatActivity() {
         val navController = navHostFragment?.findNavController()
         binding.miniplayer.setContent {
             AppTheme {
-                MiniPlayer(sharedViewModel = viewModel, onClose = { onCloseMiniplayer() }) {
-                    val bundle = Bundle()
-                    bundle.putString("type", Config.MINIPLAYER_CLICK)
-                    navController?.navigateSafe(R.id.action_global_nowPlayingFragment, bundle)
-                }
+                MiniPlayer(
+                    sharedViewModel = viewModel,
+                    onClose = { onCloseMiniplayer() },
+                    onOpen = { onOpenMiniplayer() },
+                    onClick = {
+                        val bundle = Bundle()
+                        bundle.putString("type", Config.MINIPLAYER_CLICK)
+                        navController?.navigateSafe(R.id.action_global_nowPlayingFragment, bundle)
+                    }
+                )
             }
         }
         if (viewModel.nowPlayingState.value?.mediaItem == MediaItem.EMPTY || viewModel.nowPlayingState.value?.mediaItem == null) {
@@ -359,62 +358,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-//        binding.miniplayer.showMode = SwipeLayout.ShowMode.PullOut
-//        binding.miniplayer.addDrag(SwipeLayout.DragEdge.Right, binding.llBottom)
-//        binding.miniplayer.addSwipeListener(
-//            object : SwipeLayout.SwipeListener {
-//                override fun onStartOpen(layout: SwipeLayout?) {
-//                    binding.card.radius = 0f
-//                }
-//
-//                override fun onOpen(layout: SwipeLayout?) {
-//                    binding.card.radius = 0f
-//                }
-//
-//                override fun onStartClose(layout: SwipeLayout?) {
-//                    binding.card.radius = 12f
-//                }
-//
-//                override fun onClose(layout: SwipeLayout?) {
-//                    binding.card.radius = 12f
-//                }
-//
-//                override fun onUpdate(
-//                    layout: SwipeLayout?,
-//                    leftOffset: Int,
-//                    topOffset: Int,
-//                ) {
-//                    binding.card.radius = 12f
-//                }
-//
-//                override fun onHandRelease(
-//                    layout: SwipeLayout?,
-//                    xvel: Float,
-//                    yvel: Float,
-//                ) {
-//                }
-//            },
-//        )
-//        binding.btRemoveMiniPlayer.setOnClickListener {
-//            viewModel.stopPlayer()
-//            viewModel.isServiceRunning.postValue(false)
-//            viewModel.videoId.postValue(null)
-//            binding.miniplayer.visibility = View.GONE
-//            binding.card.radius = 12f
-//        }
-//        binding.btSkipNext.setOnClickListener {
-//            viewModel.onUIEvent(UIEvent.Next)
-//            binding.card.radius = 12f
-//        }
-//
-//        binding.card.setOnClickListener {
-//            val bundle = Bundle()
-//            bundle.putString("type", Config.MINIPLAYER_CLICK)
-//            navController.navigateSafe(R.id.action_global_nowPlayingFragment, bundle)
-//        }
-//        binding.btPlayPause.setOnClickListener {
-//            viewModel.onUIEvent(UIEvent.PlayPause)
-//        }
         lifecycleScope.launch {
             val job1 =
                 launch {
@@ -482,23 +425,6 @@ class MainActivity : AppCompatActivity() {
                                                             Toast.LENGTH_SHORT,
                                                         ).show()
                                                 }
-//                                    else {
-//                                        viewModel.convertNameToId(artistId)
-//                                        viewModel.artistId.observe(this@MainActivity) {channelId ->
-//                                            when (channelId) {
-//                                                is Resource.Success -> {
-//                                                    viewModel.intent.value = null
-//                                                    navController.navigateSafe(R.id.action_global_artistFragment, Bundle().apply {
-//                                                        putString("channelId", channelId.data?.id)
-//                                                    })
-//                                                }
-//                                                is Resource.Error -> {
-//                                                    viewModel.intent.value = null
-//                                                    Toast.makeText(this@MainActivity, channelId.message, Toast.LENGTH_SHORT).show()
-//                                                }
-//                                            }
-//                                        }
-//                                    }
                                             }
 
                                         else ->
@@ -615,20 +541,10 @@ class MainActivity : AppCompatActivity() {
             showHideJob.join()
             bottomNavBarJob.join()
         }
-//        binding.card.animation = AnimationUtils.loadAnimation(this, R.anim.bottom_to_top)
-//        binding.cbFavorite.setOnClickListener {
-//            viewModel.nowPlayingMediaItem.value?.let { nowPlayingSong ->
-//                viewModel.updateLikeStatus(
-//                    nowPlayingSong.mediaId,
-//                    !runBlocking { viewModel.liked.first() },
-//                )
-//            }
-//        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-//        stopService()
         Log.w("MainActivity", "onDestroy: ")
     }
 
@@ -648,155 +564,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    //    override fun onNowPlayingSongChange() {
-//        viewModel.metadata.observe(this) {
-//            when(it){
-//                is Resource.Success -> {
-//                    binding.songTitle.text = it.data?.title
-//                    binding.songTitle.isSelected = true
-//                    if (it.data?.artists != null){
-//                        var tempArtist = mutableListOf<String>()
-//                        for (artist in it.data.artists) {
-//                            tempArtist.add(artist.name)
-//                        }
-//                        val artistName = tempArtist.connectArtists()
-//                        binding.songArtist.text = artistName
-//                    }
-//                    binding.songArtist.isSelected = true
-//                    binding.ivArt.load(it.data?.thumbnails?.get(0)?.url)
-//
-//                }
-//                is Resource.Error -> {
-//
-//                }
-//            }
-//        }
-//    }
-//
-//    override fun onIsPlayingChange() {
-//        viewModel.isPlaying.observe(this){
-//            if (it){
-//                binding.btPlayPause.setImageResource(R.drawable.baseline_pause_24)
-//            }else{
-//                binding.btPlayPause.setImageResource(R.drawable.baseline_play_arrow_24)
-//            }
-//        }
-//    }
-//
-//    override fun onUpdateProgressBar(progress: Float) {
-//
-//    }
-
-    private fun checkForUpdate() {
-        if (viewModel.shouldCheckForUpdate()) {
-            viewModel.checkForUpdate()
-            viewModel.githubResponse.observe(this) { response ->
-                if (response != null && !this.isInPictureInPictureMode && !viewModel.showedUpdateDialog) {
-                    Log.w("MainActivity", "Check for update")
-                    Log.w("MainActivity", "Current version: ${getString(R.string.version_format, VersionManager.getVersionName())}")
-                    if (response.tagName != getString(R.string.version_format, VersionManager.getVersionName())) {
-                        viewModel.showedUpdateDialog = true
-                        val inputFormat =
-                            SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
-                        val outputFormat = SimpleDateFormat("dd MMM yyyy HH:mm:ss", Locale.getDefault())
-                        val formatted =
-                            response.publishedAt?.let { input ->
-                                inputFormat
-                                    .parse(input)
-                                    ?.let { outputFormat.format(it) }
-                            }
-                        val scrollView =
-                            ScrollView(this)
-                                .apply {
-                                    layoutParams =
-                                        LinearLayout.LayoutParams(
-                                            LinearLayout.LayoutParams.MATCH_PARENT,
-                                            LinearLayout.LayoutParams.WRAP_CONTENT,
-                                        )
-                                }
-                        val layout =
-                            LinearLayout(this).apply {
-                                orientation = LinearLayout.VERTICAL
-                                layoutParams =
-                                    LinearLayout.LayoutParams(
-                                        LinearLayout.LayoutParams.MATCH_PARENT,
-                                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                                    )
-                                setPadding(24, 24, 24, 12)
-                            }
-                        layout.addView(
-                            TextView(this).apply {
-                                text =
-                                    getString(
-                                        R.string.update_message,
-                                        response.tagName,
-                                        formatted,
-                                        "",
-                                    )
-                                textSize = 13f
-                                layoutParams =
-                                    MarginLayoutParams(
-                                        MarginLayoutParams.MATCH_PARENT,
-                                        MarginLayoutParams.WRAP_CONTENT,
-                                    ).apply {
-                                        setMargins(42, 8, 42, 0)
-                                    }
-                            },
-                        )
-                        layout.addView(
-                            TextView(this).apply {
-                                text = markdownToHtml(response.body ?: "")
-                                textSize = 13f
-                                autoLinkMask = Linkify.ALL
-                                setLineSpacing(0f, 1.2f)
-                                layoutParams =
-                                    MarginLayoutParams(
-                                        MarginLayoutParams.MATCH_PARENT,
-                                        MarginLayoutParams.WRAP_CONTENT,
-                                    ).apply {
-                                        setMargins(42, 0, 42, 24)
-                                    }
-                            },
-                        )
-                        scrollView.addView(layout)
-
-                        MaterialAlertDialogBuilder(this)
-                            .setTitle(getString(R.string.update_available))
-                            .setView(scrollView)
-                            .setPositiveButton(getString(R.string.download)) { _, _ ->
-                                val browserIntent =
-                                    Intent(
-                                        Intent.ACTION_VIEW,
-                                        Uri.parse(response.assets?.firstOrNull()?.browserDownloadUrl),
-                                    )
-                                startActivity(browserIntent)
-                            }.setNegativeButton(getString(R.string.cancel)) { dialog, _ ->
-                                dialog.dismiss()
-                            }.show()
-                    }
-                }
-            }
-        }
-    }
-
-    private fun putString(
-        key: String,
-        value: String,
-    ) {
-        viewModel.putString(key, value)
-    }
-
-    private fun getString(key: String): String? = viewModel.getString(key)
-
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        viewModel.activityRecreate()
-    }
-
-    private fun onCloseMiniplayer() {
-        viewModel.stopPlayer()
-        viewModel.isServiceRunning.postValue(false)
-        viewModel.videoId.postValue(null)
-        binding.miniplayer.visibility = View.GONE
-    }
-}
+    private fun check
