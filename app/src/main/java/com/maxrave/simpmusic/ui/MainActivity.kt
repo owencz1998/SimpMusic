@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity() {
             )
             putString(SELECTED_LANGUAGE, AppCompatDelegate.getApplicationLocales().toLanguageTags())
         }
-//
+
         enableEdgeToEdge(
             navigationBarStyle =
                 SystemBarStyle.auto(
@@ -566,4 +566,4 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkForUpdate() {
-        if (viewModel.shouldCheck
+        if (view
