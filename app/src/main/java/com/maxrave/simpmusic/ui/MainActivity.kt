@@ -565,5 +565,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkForUpdate() {
-        if (viewModel.shouldCheckForUpdate()) {
+    private fun checkFor
