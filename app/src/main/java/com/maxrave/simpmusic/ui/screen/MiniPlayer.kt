@@ -91,7 +91,7 @@ import kotlin.math.roundToInt
 fun MiniPlayer(
     sharedViewModel: SharedViewModel,
     onClose: () -> Unit,
-    onOpen: () -> Unit,  // Ensure onOpen callback is added
+    onOpen: () -> Unit,
     onClick: () -> Unit,
 ) {
     val (songEntity, setSongEntity) = remember { mutableStateOf<SongEntity?>(null) }
@@ -102,15 +102,14 @@ fun MiniPlayer(
     val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec, label = "")
     val paletteState = rememberPaletteState()
     val background = remember { Animatable(Color.DarkGray) }
-    val offsetX = remember { Animatable(initialValue = 0f) }
+    val offsetX = remember { Animatable(0f) }
     val offsetY = remember { Animatable(0f) }
     var loading by rememberSaveable { mutableStateOf(true) }
     var bitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
     LaunchedEffect(bitmap) {
-        val bm = bitmap
-        if (bm != null) {
-            paletteState.generate(bm)
+        bitmap?.let {
+            paletteState.generate(it)
         }
     }
 
@@ -122,11 +121,11 @@ fun MiniPlayer(
             }
     }
 
-    LaunchedEffect(key1 = true) {
+    LaunchedEffect(true) {
         val job1 = launch {
             sharedViewModel.nowPlayingState.collect { item ->
-                if (item != null) {
-                    setSongEntity(item.songEntity)
+                item?.let {
+                    setSongEntity(it.songEntity)
                 }
             }
         }
@@ -180,7 +179,7 @@ fun MiniPlayer(
                             if (offsetY.value > 70) {
                                 onClose()
                             } else if (offsetY.value < -70) {
-                                onOpen()  // Trigger onOpen when swiped up
+                                onOpen()
                             }
                             offsetY.animateTo(0f)
                         }
