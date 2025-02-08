@@ -92,7 +92,57 @@ import kotlin.math.roundToInt
 fun MiniPlayer(
     sharedViewModel: SharedViewModel,
     onClose: () -> Unit,
+    onOpen: () -> Unit,  // Add onOpen callback
     onClick: () -> Unit,
+) {
+    // ... (existing code)
+
+    val coroutineScope = rememberCoroutineScope()
+
+    val offsetY = remember { Animatable(0f) }
+
+    // ... (existing code)
+
+    ElevatedCard(
+        // ... (existing code)
+        modifier = Modifier
+            .clipToBounds()
+            .fillMaxHeight()
+            .offset { IntOffset(0, offsetY.value.roundToInt()) }
+            .clickable(onClick = onClick)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragStart = {
+                    },
+                    onVerticalDrag = { change: PointerInputChange, dragAmount: Float ->
+                        coroutineScope.launch {
+                            change.consume()
+                            offsetY.animateTo(offsetY.value + dragAmount)
+                        }
+                    },
+                    onDragCancel = {
+                        coroutineScope.launch {
+                            offsetY.animateTo(0f)
+                        }
+                    },
+                    onDragEnd = {
+                        coroutineScope.launch {
+                            if (offsetY.value > 70) {
+                                onClose()
+                            } else if (offsetY.value < -70) {
+                                onOpen()  // Trigger onOpen when swiped up
+                            }
+                            offsetY.animateTo(0f)
+                        }
+                    },
+                )
+            },
+    ) {
+        Box(modifier = Modifier.fillMaxHeight()) {
+            // ... (existing code)
+        }
+    }
+}
 ) {
     val (songEntity, setSongEntity) =
         remember {
