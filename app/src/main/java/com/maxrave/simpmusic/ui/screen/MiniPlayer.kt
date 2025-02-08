@@ -5,7 +5,6 @@ import androidx.compose.animation.Animatable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -67,10 +66,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.util.UnstableApi
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
-import coil3.toBitmap
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.request.crossfade
+import coil.toBitmap
 import com.kmpalette.rememberPaletteState
 import com.maxrave.simpmusic.R
 import com.maxrave.simpmusic.data.db.entities.SongEntity
@@ -92,7 +91,7 @@ import kotlin.math.roundToInt
 fun MiniPlayer(
     sharedViewModel: SharedViewModel,
     onClose: () -> Unit,
-    onOpen: () -> Unit,  // Add onOpen callback
+    onOpen: () -> Unit,  // Ensure onOpen callback is added
     onClick: () -> Unit,
 ) {
     val (songEntity, setSongEntity) = remember { mutableStateOf<SongEntity?>(null) }
@@ -100,13 +99,7 @@ fun MiniPlayer(
     val (isPlaying, setIsPlaying) = remember { mutableStateOf(false) }
     val (progress, setProgress) = remember { mutableFloatStateOf(0f) }
     val coroutineScope = rememberCoroutineScope()
-
-    val animatedProgress by animateFloatAsState(
-        targetValue = progress,
-        animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
-        label = "",
-    )
-
+    val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec, label = "")
     val paletteState = rememberPaletteState()
     val background = remember { Animatable(Color.DarkGray) }
     val offsetX = remember { Animatable(initialValue = 0f) }
