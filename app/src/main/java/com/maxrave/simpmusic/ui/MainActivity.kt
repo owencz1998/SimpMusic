@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.res.Configuration
+import android.graphics.Rect
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -11,19 +14,29 @@ import android.os.IBinder
 import android.text.util.Linkify
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup.MarginLayoutParams
 import android.view.animation.AnimationUtils
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.maxrave.simpmusic.R
 import com.maxrave.simpmusic.common.Config
@@ -31,9 +44,11 @@ import com.maxrave.simpmusic.common.FIRST_TIME_MIGRATION
 import com.maxrave.simpmusic.common.SELECTED_LANGUAGE
 import com.maxrave.simpmusic.common.STATUS_DONE
 import com.maxrave.simpmusic.common.SUPPORTED_LANGUAGE
+import com.maxrave.simpmusic.common.SUPPORTED_LOCATION
 import com.maxrave.simpmusic.data.dataStore.DataStoreManager
 import com.maxrave.simpmusic.databinding.ActivityMainBinding
 import com.maxrave.simpmusic.extension.isMyServiceRunning
+import com.maxrave.simpmusic.extension.markdownToHtml
 import com.maxrave.simpmusic.extension.navigateSafe
 import com.maxrave.simpmusic.service.SimpleMediaService
 import com.maxrave.simpmusic.ui.screen.MiniPlayer
@@ -42,9 +57,12 @@ import com.maxrave.simpmusic.utils.VersionManager
 import com.maxrave.simpmusic.viewModel.SharedViewModel
 import dev.chrisbanes.insetter.applyInsetter
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import pub.devrel.easypermissions.EasyPermissions
+import java.text.SimpleDateFormat
 import java.util.Locale
 
 @UnstableApi
