@@ -87,40 +87,422 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-
+@Composable
 @UnstableApi
 fun MiniPlayer(
     sharedViewModel: SharedViewModel,
     onClose: () -> Unit,
     onClick: () -> Unit,
-    position: Long,
-    duration: Long,
-    modifier: Modifier = Modifier,
 ) {
-    val (songEntity, setSongEntity) = remember { mutableStateOf<SongEntity?>(null) }
-    val (liked, setLiked) = remember { mutableStateOf(false) }
-    val (isPlaying, setIsPlaying) = remember { mutableStateOf(false) }
-    val (progress, setProgress) = remember { mutableFloatStateOf(0f) }
+    val (songEntity, setSongEntity) =
+        remember {
+            mutableStateOf<SongEntity?>(null)
+        }
+    val (liked, setLiked) =
+        remember {
+            mutableStateOf(false)
+        }
+    val (isPlaying, setIsPlaying) =
+        remember {
+            mutableStateOf(false)
+        }
+    val (progress, setProgress) =
+        remember {
+            mutableFloatStateOf(0f)
+        }
+
     val coroutineScope = rememberCoroutineScope()
 
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
-        label = ""
+        label = "",
     )
 
-    val playerConnection = LocalPlayerConnection.current ?: return
-    val playbackState by playerConnection.playbackState.collectAsState()
-    val error by playerConnection.error.collectAsState()
-    val mediaMetadata by playerConnection.mediaMetadata.collectAsState()
-    val canSkipNext by playerConnection.canSkipNext.collectAsState()
+    // Palette state
+    val paletteState = rememberPaletteState()
+    val background =
+        remember {
+            Animatable(Color.DarkGray)
+        }
 
-    // To manage dragging and background color
+    val offsetX = remember { Animatable(initialValue = 0f) }
     val offsetY = remember { Animatable(0f) }
+
+    var loading by rememberSaveable {
+        mutableStateOf(true)
+    }
+
+    var bitmap by remember {
+        mutableStateOf<ImageBitmap?>(null)
+    }
+
+    LaunchedEffect(bitmap) {
+        val bm = bitmap
+        if (bm != null) {
+            paletteState.generate(bm)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { paletteState.palette }
+            .distinctUntilChanged()
+            .collectLatest {
+                background.animateTo(it.getColorFromPalette())
+            }
+    }
+
+    LaunchedEffect(key1 = true) {
+        val job1 =
+            launch {
+                sharedViewModel.nowPlayingState.collect { item ->
+                    if (item != null) {
+                        setSongEntity(item.songEntity)
+                    }
+                }
+            }
+        val job2 =
+            launch {
+                sharedViewModel.controllerState.collectLatest { state ->
+                    setLiked(state.isLiked)
+                    setIsPlaying(state.isPlaying)
+                }
+            }
+        val job4 =
+            launch {
+                sharedViewModel.timeline.collect { timeline ->
+                    loading = timeline.loading
+                    val prog =
+                        if (timeline.total > 0L && timeline.current >= 0L) {
+                            timeline.current.toFloat() / timeline.total
+                        } else {
+                            0f
+                        }
+                    setProgress(prog)
+                }
+            }
+        job1.join()
+        job2.join()
+        job4.join()
+    }
+
+    ElevatedCard(
+        elevation = CardDefaults.elevatedCardElevation(10.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = background.value,
+            ),
+        modifier =
+            Modifier
+                .clipToBounds()
+                .fillMaxHeight()
+                .offset { IntOffset(0, offsetY.value.roundToInt()) }
+                .clickable(
+                    onClick = onClick,
+                ).pointerInput(Unit) {
+                    detectVerticalDragGestures(
+                        onDragStart = {
+                        },
+                        onVerticalDrag = { change: PointerInputChange, dragAmount: Float ->
+                            if (offsetY.value + dragAmount > 0) {
+                                coroutineScope.launch {
+                                    change.consume()
+                                    offsetY.animateTo(offsetY.value + dragAmount)
+                                    Log.w("MiniPlayer", "Dragged ${offsetY.value}")
+                                }
+                            }
+                        },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                offsetY.animateTo(0f)
+                            }
+                        },
+                        onDragEnd = {
+                            Log.w("MiniPlayer", "Drag Ended")
+                            coroutineScope.launch {
+                                if (offsetY.value > 70) {
+                                    onClose()
+                                }
+                                offsetY.animateTo(0f)
+                            }
+                        },
+                    )
+                },
+    ) {
+        Box(modifier = Modifier.fillMaxHeight()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier =
+                    Modifier
+                        .fillMaxSize(),
+            ) {
+                Spacer(modifier = Modifier.size(8.dp))
+                Box(modifier = Modifier.weight(1F)) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                                .pointerInput(Unit) {
+                                    detectHorizontalDragGestures(
+                                        onDragStart = {
+                                        },
+                                        onHorizontalDrag = {
+                                            change: PointerInputChange,
+                                            dragAmount: Float,
+                                            ->
+                                            coroutineScope.launch {
+                                                change.consume()
+                                                offsetX.animateTo(offsetX.value + dragAmount)
+                                                Log.w("MiniPlayer", "Dragged ${offsetX.value}")
+                                            }
+                                        },
+                                        onDragCancel = {
+                                            Log.w("MiniPlayer", "Drag Cancelled")
+                                            coroutineScope.launch {
+                                                if (offsetX.value > 200) {
+                                                    sharedViewModel.onUIEvent(UIEvent.Previous)
+                                                } else if (offsetX.value < -120) {
+                                                    sharedViewModel.onUIEvent(UIEvent.Next)
+                                                }
+                                                offsetX.animateTo(0f)
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            Log.w("MiniPlayer", "Drag Ended")
+                                            coroutineScope.launch {
+                                                if (offsetX.value > 200) {
+                                                    sharedViewModel.onUIEvent(UIEvent.Previous)
+                                                } else if (offsetX.value < -120) {
+                                                    sharedViewModel.onUIEvent(UIEvent.Next)
+                                                }
+                                                offsetX.animateTo(0f)
+                                            }
+                                        },
+                                    )
+                                },
+                    ) {
+                        AsyncImage(
+                            model =
+                                ImageRequest
+                                    .Builder(LocalContext.current)
+                                    .data(songEntity?.thumbnails)
+                                    .crossfade(550)
+                                    .build(),
+                            placeholder = painterResource(R.drawable.holder),
+                            error = painterResource(R.drawable.holder),
+                            contentDescription = null,
+                            contentScale = ContentScale.FillWidth,
+                            onSuccess = {
+                                bitmap =
+                                    it.result.image
+                                        .toBitmap()
+                                        .asImageBitmap()
+                            },
+                            modifier =
+                                Modifier
+                                    .size(40.dp)
+                                    .align(Alignment.CenterVertically)
+                                    .clip(
+                                        RoundedCornerShape(4.dp),
+                                    ),
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        AnimatedContent(
+                            targetState = songEntity,
+                            modifier = Modifier.weight(1F).fillMaxHeight(),
+                            contentAlignment = Alignment.CenterStart,
+                            transitionSpec = {
+                                // Compare the incoming number with the previous number.
+                                if (targetState != initialState) {
+                                    // If the target number is larger, it slides up and fades in
+                                    // while the initial (smaller) number slides up and fades out.
+                                    (
+                                        slideInHorizontally { width ->
+                                            width
+                                        } + fadeIn()
+                                    ).togetherWith(
+                                        slideOutHorizontally { width -> +width } + fadeOut(),
+                                    )
+                                } else {
+                                    // If the target number is smaller, it slides down and fades in
+                                    // while the initial number slides down and fades out.
+                                    (
+                                        slideInHorizontally { width ->
+                                            +width
+                                        } + fadeIn()
+                                    ).togetherWith(
+                                        slideOutHorizontally { width -> width } + fadeOut(),
+                                    )
+                                }.using(
+                                    // Disable clipping since the faded slide-in/out should
+                                    // be displayed out of bounds.
+                                    SizeTransform(clip = false),
+                                )
+                            },
+                        ) { target ->
+                            if (target != null) {
+                                Column(
+                                    Modifier
+                                        .wrapContentHeight()
+                                        .align(Alignment.CenterVertically),
+                                ) {
+                                    Text(
+                                        text = (songEntity?.title ?: "").toString(),
+                                        style = typo.labelSmall,
+                                        color = Color.White,
+                                        maxLines = 1,
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .wrapContentHeight(
+                                                    align = Alignment.CenterVertically,
+                                                ).basicMarquee(
+                                                    iterations = Int.MAX_VALUE,
+                                                    animationMode = MarqueeAnimationMode.Immediately,
+                                                ).focusable(),
+                                    )
+                                    LazyRow(verticalAlignment = Alignment.CenterVertically) {
+                                        item {
+                                            androidx.compose.animation.AnimatedVisibility(visible = songEntity?.isExplicit == true) {
+                                                ExplicitBadge(
+                                                    modifier =
+                                                        Modifier
+                                                            .size(20.dp)
+                                                            .padding(end = 4.dp)
+                                                            .weight(1f),
+                                                )
+                                            }
+                                        }
+                                        item {
+                                            Text(
+                                                text = (songEntity?.artistName?.connectArtists() ?: "").toString(),
+                                                style = typo.bodySmall,
+                                                maxLines = 1,
+                                                modifier =
+                                                    Modifier
+                                                        .fillMaxWidth()
+                                                        .wrapContentHeight(
+                                                            align = Alignment.CenterVertically,
+                                                        ).basicMarquee(
+                                                            iterations = Int.MAX_VALUE,
+                                                            animationMode = MarqueeAnimationMode.Immediately,
+                                                        ).focusable(),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.width(15.dp))
+                HeartCheckBox(checked = liked, size = 30) {
+                    sharedViewModel.onUIEvent(UIEvent.ToggleLike)
+                }
+                Spacer(modifier = Modifier.width(15.dp))
+                Crossfade(targetState = loading, label = "") {
+                    if (it) {
+                        Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color.LightGray,
+                                strokeWidth = 3.dp,
+                            )
+                        }
+                    } else {
+                        PlayPauseButton(isPlaying = isPlaying, modifier = Modifier.size(48.dp)) {
+                            sharedViewModel.onUIEvent(UIEvent.PlayPause)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(15.dp))
+            }
+            Box(
+                modifier =
+                    Modifier
+                        .wrapContentSize(Alignment.Center)
+                        .padding(
+                            horizontal = 10.dp,
+                        ).align(Alignment.BottomCenter),
+            ) {
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(
+                                color = Color.Transparent,
+                                shape = RoundedCornerShape(4.dp),
+                            ),
+                    color = Color.White,
+                    trackColor = Color.Transparent,
+                    strokeCap = StrokeCap.Round,
+                    drawStopIndicator = {},
+                )
+            }
+        }
+    }
+}
+import androidx.compose.animation.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+
+@Composable
+@UnstableApi
+fun MiniPlayer(
+    sharedViewModel: SharedViewModel,
+    onClose: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val playerConnection = LocalPlayerConnection.current ?: return
+    val (songEntity, setSongEntity) = remember { mutableStateOf(null) }
+    val (liked, setLiked) = remember { mutableStateOf(false) }
+    val (isPlaying, setIsPlaying) = remember { mutableStateOf(false) }
+    val (progress, setProgress) = remember { mutableFloatStateOf(0f) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    // Palette state for background color
+    val paletteState = rememberPaletteState()
     val background = remember { Animatable(Color.DarkGray) }
 
-    // Observe sharedViewModel state
+    // Dragging states
+    val offsetX = remember { Animatable(initialValue = 0f) }
+    val offsetY = remember { Animatable(0f) }
+
+    // Bitmap for the current song thumbnail
+    var bitmap by remember { mutableStateOf(null) }
+
+    LaunchedEffect(bitmap) {
+        bitmap?.let {
+            paletteState.generate(it)
+        }
+    }
+
     LaunchedEffect(Unit) {
+        snapshotFlow { paletteState.palette }
+            .distinctUntilChanged()
+            .collect { color ->
+                background.animateTo(color.getColorFromPalette())
+            }
+    }
+
+    LaunchedEffect(true) {
         launch {
             sharedViewModel.nowPlayingState.collect { item ->
                 if (item != null) {
@@ -151,17 +533,12 @@ fun MiniPlayer(
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = background.value),
         modifier = modifier
+            .clipToBounds()
             .fillMaxHeight()
             .offset { IntOffset(0, offsetY.value.roundToInt()) }
+            .clickable(onClick = onClick)
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
-                    onDragStart = { },
-                    onVerticalDrag = { change, dragAmount ->
-                        coroutineScope.launch {
-                            change.consume()
-                            offsetY.animateTo(offsetY.value + dragAmount)
-                        }
-                    },
                     onDragEnd = {
                         coroutineScope.launch {
                             if (offsetY.value > 70) {
@@ -175,7 +552,7 @@ fun MiniPlayer(
     ) {
         Box(modifier = Modifier.fillMaxHeight()) {
             LinearProgressIndicator(
-                progress = (position.toFloat() / duration).coerceIn(0f, 1f),
+                progress = progress.coerceIn(0f, 1f),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(3.dp)
@@ -183,20 +560,43 @@ fun MiniPlayer(
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxSize().padding(end = 6.dp)
+                modifier = Modifier.fillMaxSize().padding(end = 6.dp),
             ) {
-                Box(Modifier.weight(1f)) {
-                    mediaMetadata?.let {
-                        MiniMediaInfo(
-                            mediaMetadata = it,
-                            error = error,
-                            modifier = Modifier.padding(horizontal = 6.dp)
-                        )
+                Spacer(modifier = Modifier.size(8.dp))
+                Box(modifier = Modifier.weight(1F)) {
+                    Row(
+                        modifier = Modifier
+                            .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                            .pointerInput(Unit) {
+                                detectHorizontalDragGestures(
+                                    onDragEnd = {
+                                        coroutineScope.launch {
+                                            if (offsetX.value > 200) {
+                                                sharedViewModel.onUIEvent(UIEvent.Previous)
+                                            } else if (offsetX.value  width } + fadeIn()).togetherWith(
+                                        slideOutHorizontally { width -> +width } + fadeOut()
+                                    )
+                                } else {
+                                    // Handle other transitions if needed
+                                    fadeIn() with fadeOut()
+                                }
+                            }
+                        ) { song ->
+                            song?.let {
+                                Text(
+                                    text = it.title,
+                                    style = MaterialTheme.typography.body1,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
                     }
                 }
+
                 IconButton(
                     onClick = {
-                        if (playbackState == Player.STATE_ENDED) {
+                        if (playerConnection.playbackState.value == Player.STATE_ENDED) {
                             playerConnection.player.seekTo(0, 0)
                             playerConnection.player.playWhenReady = true
                         } else {
@@ -205,12 +605,17 @@ fun MiniPlayer(
                     }
                 ) {
                     Icon(
-                        painter = painterResource(if (playbackState == Player.STATE_ENDED) R.drawable.replay else if (isPlaying) R.drawable.pause else R.drawable.play),
+                        painter = painterResource(
+                            if (playerConnection.playbackState.value == Player.STATE_ENDED) R.drawable.replay
+                            else if (isPlaying) R.drawable.pause
+                            else R.drawable.play
+                        ),
                         contentDescription = null
                     )
                 }
+
                 IconButton(
-                    enabled = canSkipNext,
+                    enabled = playerConnection.canSkipNext.collectAsState().value,
                     onClick = playerConnection::seekToNext
                 ) {
                     Icon(
@@ -263,6 +668,7 @@ fun MiniMediaInfo(
                 }
             }
         }
+
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -286,3 +692,16 @@ fun MiniMediaInfo(
         }
     }
 }
+
+Key Features:
+State Management**: Combines views and state management from both provided snippets.
+Thumbnail Handling**: Displays the song thumbnail and handles loading states.
+Playback Controls**: Includes buttons for play/pause and skip functionalities.
+Drag Gesture Handling**: Allows you to swipe to navigate between songs and dismiss the player.
+
+Notes:
+Make sure to replace SharedViewModel, SongEntity, MediaMetadata, and other placeholders with your actual implementations and resources.
+Ensure you have the necessary imports based on your project structure.
+The AsyncImage part assumes you have an appropriate image loading library, such as Coil.
+
+Let me know if you need further adjustments or additional features!
