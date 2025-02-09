@@ -65,7 +65,7 @@ fun LibraryScreen(
         contentPadding = innerPadding,
     ) {
         item {
-            Spacer(Modifier.height(64.dp))
+            Spacer(Modifier.height(60.dp))
         }
         item {
             LibraryTilingBox(navController)
